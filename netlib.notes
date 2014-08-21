@@ -1,0 +1,201 @@
+
+This .notes file began (and is still named) as a netlib-specific notes file,
+but it quickly (and succesfully) expanded into a 'recipe' for compiling
+SWObjects in such a way that it depends on various Debian-repository provided
+binaries!
+
+Notes on compiling (and 'using'!) netlib and the example client program
+(provided by Custodix) in Linux.
+
+  -  First, you could compile a fresh installation of boost `from scratch'.
+     You need a recent version of it (1.54 or later!) in order to be able to
+     compile cpp-netlib.
+
+     My approach is (on Debian 7 - 32bit)...
+
+       +  mkdir /usr/local/sw; chown raymond.raymond /usr/local/sw
+
+       +  cd ~/stuff; tar -xvf boost_1_55_0.tar.bz2
+
+       +  LDFLAGS=-Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags \
+           ./bootstrap.sh --prefix=/usr/local/sw
+
+       +  ./b2 dll-path=/usr/local/sw/lib
+
+       +  .... patience ....
+
+       +  ./b2 dll-path=/usr/local/sw/lib install
+
+  -  (figuratively and literally) check out
+     <https://github.com/cpp-netlib/cpp-netlib/tree/0.11-devel>
+
+     note: these steps are performed on 2014-08-21 e.g. with the state of the
+           repository of that particular date. On other days be dragons!
+
+     this is a development branch of cpp-netlib that contains the neccesary
+     additions for dealing with http:// traffic.
+
+       +  cd ~/stuff
+
+       +  git clone https://github.com/cpp-netlib/cpp-netlib.git
+
+       +  git checkout 0.11-devel
+
+  -  Compiling it (the environment variables are quite illustrative):
+
+       +  export BOOST_ROOT=/usr/local/sw
+
+       +  export BOOST_LIB=/usr/local/sw/lib
+
+     cmake -DBoost_ADDITIONAL_VERSIONS=1.55 \
+           -DBOOST_ROOT=${BOOST_ROOT} \
+           -DBOOST_LIBRARYDIR=${BOOST_LIB} \
+           -DCMAKE_INSTALL_RPATH=/usr/local/sw/lib \
+           -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/sw .
+
+       +  LDFLAGS=-Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags make -j 2
+
+       +  LDFLAGS=-Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags make install
+
+     I got some errors which I "fixed":
+
+       +  problem: undef. reference to `boost::thread::start_thread_noexcept()'
+
+          where: in libs/network/example
+
+          solution: delete the contents of this directory, add/touch an empty
+          CMakeLists.txt file.
+
+
+       +  problem: the same undef. reference
+
+          where: in libs/network/test
+
+          solution: delete the contents of this directory, add/touch an empty
+          CMakeLists.txt file.
+
+       +  make install
+
+  -  Compile the example program provided by Jelle:
+
+       +  g++ -I /usr/local/sw/include -c ssl_server.cpp
+
+       +  g++ -g -o ssl_server ssl_server.o \
+              -Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags \
+              -L /usr/local/sw/lib \
+              -L /usr/local/sw/lib/i386-linux-gnu \
+                -lboost_system \
+                -lboost_thread \
+                -lpthread -lcrypto -lssl \
+                -lcppnetlib-client-connections -lcppnetlib-server-parsers
+
+  -  Running 'ssl_server' is simply a matter running the binary
+     (everything is RPATH'ed now; you don't need to provide LD_LIBRARY_PATHs)
+
+  -  ``deploy'' it:
+
+       +  mkdir /usr/local/sw/bin
+
+       +  cp ssl_server /usr/local/sw/bin/ssl_server_demo
+
+  -  Prepare to connect to 'ssl_server' with curl (you need a private key
+     for that, and you need to extract it):
+
+     openssl pkcs12 -in client.p12 -out client.pem
+
+     the passwords you need to provide are all 'test'
+
+  -  Connecting to 'ssl_server' with curl:
+
+     curl -k --cert client.pem:test https://localhost:8442
+
+
+
+Notes on building and installing SWObjects into /usr/local/sw:
+
+  -  apt-get install \
+       libmysqlclient-dev libpq-dev freetds-dev unixodbc-dev libcrypto++-dev
+
+  -  cd ~/stuff
+
+  -  git clone https://github.com/ericprud/SWObjects.git SWObjects-fresh
+
+  -  cd SWObjects-fresh
+
+  -  edit bin/sparql.cpp and put at the top:
+
+     #define SVN_Revision "1234"
+     #define SVN_Last_Changed_Date "2014-07-01"
+     #define SVN_Last_Changed_Author "unknown"
+     #define SVN_URL "unknown"
+
+  -  edit Makefile and remove '-static' from the 'release:' goal (line 342)
+
+  -  then finally...
+
+     CPATH=/usr/local/sw/include \
+     LD_LIBRARY_PATH=/usr/local/sw/lib \
+     LDFLAGS=-Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags make release
+
+     That failed during linking. I linked manually:
+
+     LD_LIBRARY_PATH=/usr/local/sw/lib \
+      LDFLAGS=-Wl,-rpath=/usr/local/sw/lib,--enable-new-dtags \
+      g++ ..... yadda yadda
+
+  -  ``deploy'' it:
+
+       +  cp release /usr/local/sw/bin/sw-release
+
+
+
+Notes on trimming /usr/local/sw (which weights around 218MB after executing
+all previous steps) to its bare neccesities:
+
+  -  strip /usr/local/sw/*
+
+  -  mv /usr/local/sw /usr/local/sw-full
+
+  -  mkdir /usr/local/sw; cd /usr/local/sw
+
+  -  cp -r ../sw-full/bin .
+
+  -  mkdir lib; cd lib/
+
+     for i in
+     log thread filesystem system date_time regex program_options chrono; do
+       cp ../../sw-full/lib/libboost_${i}.so.1.55.0 .
+     done
+
+
+
+Other notes & hints:
+
+
+
+ *** rpath 'detection':
+
+objdump -x ssl_server | grep RPATH
+
+
+
+ *** git submodules checkout.
+
+In the past I needed to do something like this in order to get 
+
+%|| git clone git://github.com/foo/bar.git
+%|| cd bar
+%|| git submodule update --init --recursive
+
+Why isn't this neccesary any more?
+
+
+
+ *** using gdb
+
+%|| Gdb: compile/link with -g; LD_LIBRARY_PATH=...
+%|| gdb bin/SPARQL
+%|| b main
+%|| R <cmdline args>
+%|| b file:line (or CTL space on that line); up, down, next, step, fin.
+
