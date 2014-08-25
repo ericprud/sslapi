@@ -45,7 +45,9 @@ endif(Boost_FOUND)
 
 # Server sources
 SET(SERVER_SRC
-ssl_server.cpp)
+ssl_server.cpp
+server.h
+server.cpp)
 
 # Client sources
 SET(CLIENT_SRC
