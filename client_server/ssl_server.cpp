@@ -37,10 +37,17 @@ struct handler
     {
 		// Set response status
 		conn->set_status(server::connection::ok);
+		server::response_header headers[] = {
+			{"Content-type","text/html"},
+			{"Connection","close"},
+			{"X-Powered-By", "Hamsters"}
+		};
+		conn->set_headers(boost::make_iterator_range(headers, headers+3));
+
 		std::stringstream out;
-		out << "HTTP/1.0 200 ok" << std::endl
-			<< "Content-type: text/html" << std::endl << std::endl
-			<< "<HTML><HEAD/><BODY>Hello " << name << ", connecting from " << req.source.c_str() << ", you visited " << req.destination << "</BODY></HTML>" << std::endl;
+		out << "<HTML><HEAD/><BODY>Hello " << name << 
+			", connecting from " << req.source.c_str() << ", you visited " << 
+			req.destination << "</BODY></HTML>" << std::endl;
 
 		// Write standard message
 		conn->write(out.str());
