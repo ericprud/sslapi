@@ -87,7 +87,7 @@ public:
                     boost::bind(&client::handle_connect, this,
                     boost::asio::placeholders::error, ++endpoint_iterator));
         } else {
-            std::cout << "Connect failed: " << error << "\n";
+            std::cout << "Connect failed (" << error << "): " << error.message()  << "\n";
         }
     }
 
@@ -100,7 +100,7 @@ public:
 
             std::cin.getline(in, max_length);
 			// Send an actual http post
-			sprintf_s(request_,"GET /%s HTTP/1.1\r\n\r\n", in);
+			sprintf(request_,"GET /%s HTTP/1.1\r\n\r\n", in);
 
             size_t request_length = strlen(request_);
 			// Print the request
@@ -112,7 +112,7 @@ public:
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred));
         } else {
-            std::cout << "Handshake failed: " << error << "\n";
+            std::cout << "Handshake failed (" << error << "): " << error.message()  << "\n";
         }
     }
 
@@ -128,7 +128,7 @@ public:
                     boost::asio::placeholders::error,
                     boost::asio::placeholders::bytes_transferred));
         } else {
-            std::cout << "Write failed: " << error << "\n";
+            std::cout << "Write failed (" << error << "): " << error.message()  << "\n";
         }
     }
 
@@ -141,7 +141,7 @@ public:
             std::cout.write(boost::asio::buffer_cast<const char*>(reply_.data()), bytes_transferred);
             std::cout << "\n";
         } else {
-			std::cout << "Read failed: " << error << std::endl << error.message() << std::endl << error.value() << std::endl;
+			std::cout << "Read failed (" << error << "): " << error.message()  << "\n";
         }
     }
 
