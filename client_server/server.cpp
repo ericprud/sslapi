@@ -21,17 +21,23 @@ void handler::operator()(server::request const& req, const server::connection_pt
 	server::response_header headers[] = {
 		{"Content-type","text/html"},
 		{"Connection","close"},
-		{"X-Powered-By", "Hamsters"}
+		{"X-Powered-By", "Nuclear hamsters"}
 	};
 	conn->set_headers(boost::make_iterator_range(headers, headers+3));
 
 	std::stringstream out;
-	out << "<HTML><HEAD/><BODY>Hello " << name << 
-		", connecting from " << req.source.c_str() << ", you visited " << 
-		req.destination << "</BODY></HTML>" << std::endl;
+	out << "<HTML><HEAD/><BODY><pre>client: " << name << 
+		"\nconnection: " << req.source.c_str() << "\npath: " << 
+	    req.destination << "\n";
+	// for (unsigned i = 0; i < 0x100; ++i)
+	//     for (unsigned j = 0; j < 0x100; ++j)
+	// 	out << "[" << i << "," << j << "]";
+	out << "</pre></BODY></HTML>" << std::endl;
 
 	// Write standard message
 	conn->write(out.str());
+
+	p_server_instance->done();
 }
 	
 /**
@@ -80,10 +86,9 @@ bool handler::verify_cert(bool preverified,  boost::asio::ssl::verify_context& c
 }
 
 
+netlib_server::netlib_server(unsigned int port) :
+    p_io_service(boost::make_shared< boost::asio::io_service >()), port(port), request_handler(this), stopAfter(RunForever) {
 
-netlib_server::netlib_server() :
-		p_io_service(boost::make_shared< boost::asio::io_service >()) {
-		
 			boost::shared_ptr<boost::asio::ssl::context> ctx = boost::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
 			ctx->set_options(
 						boost::asio::ssl::context::default_workarounds
@@ -103,12 +108,12 @@ netlib_server::netlib_server() :
 			ctx->set_verify_callback(boost::bind(&handler::verify_cert, &request_handler, _1, _2));
 			ctx->load_verify_file("ca.crt");
 
-			
+			std::string portStr = boost::lexical_cast<std::string>(port);
 			p_server_instance =
 					boost::make_shared<server>(
 							server::options(request_handler).
 									address("0.0.0.0")
-									.port("8442")
+							.port(portStr.c_str())
 									.io_service(p_io_service)
 									.reuse_address(true)
 									.thread_pool(boost::make_shared<boost::network::utils::thread_pool>(2))
@@ -119,6 +124,7 @@ netlib_server::netlib_server() :
 }
 
 void netlib_server::run() {
+    std::cout << "Working directory: . " << port << std::endl;
 	p_server_instance->run();
 }
 
@@ -126,8 +132,13 @@ void netlib_server::stop() {
 	p_io_service->stop();
 }
 
-netlib_server& netlib_server::get_instance() {
-	static netlib_server instance;
+void netlib_server::done() {
+    if (stopAfter != RunForever && --stopAfter == 0)
+	stop();
+}
+
+netlib_server& netlib_server::get_instance(unsigned int port) {
+	static netlib_server instance(port);
 	return instance;
 }
 

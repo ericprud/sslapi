@@ -11,7 +11,7 @@ set(Boost_USE_MULTITHREADED ON)
 
 # Find openssl + boost
 FIND_PACKAGE(OpenSSL)
-FIND_PACKAGE(Boost 1.55 COMPONENTS thread date_time program_options filesystem system chrono regex REQUIRED)
+FIND_PACKAGE(Boost 1.54 COMPONENTS thread date_time program_options filesystem system chrono regex REQUIRED)
 
 # Find CPP-NETLIB
 set(CPP_NETLIB_INCLUDE_DIR "" CACHE FILEPATH "Path to cpp-netlib source dir")
@@ -47,11 +47,17 @@ endif(Boost_FOUND)
 SET(SERVER_SRC
 ssl_server.cpp
 server.h
+url.hpp
 server.cpp)
 
 # Client sources
 SET(CLIENT_SRC
+url.hpp
 client.cpp)
+
+# Test sources
+SET(TESTSERVER_SRC
+testServer.cpp)
 
 # Define all keys
 SET(KEYS
@@ -72,6 +78,10 @@ target_link_libraries(server ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${server_pa
 # Client
 add_executable(client ${CLIENT_SRC})
 target_link_libraries(client ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
+# Test adds -lboost_unit_test_framework
+add_executable(testServer ${TESTSERVER_SRC})
+target_link_libraries(testServer ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 # Copy the keys to the directory where the server executable is located (some extra keys are included which can be used by the client)
 foreach( key ${KEYS} )

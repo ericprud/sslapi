@@ -10,6 +10,8 @@
 
 #include <boost/exception/all.hpp>
 
+#include "url.hpp"
+
 enum {
     max_length = 1024
 };
@@ -35,7 +37,7 @@ class client
 public:
 	
 	/// Create a new client with the given settings
-	static client* create_client(std::string host, std::string port, std::string client_cert, std::string client_key, std::string client_keypass, std::string server_cert, std::string dh_file) {
+    static client* create_client(std::string host, std::string port, std::string path, std::string client_cert, std::string client_key, std::string client_keypass, std::string server_cert, std::string dh_file) {
 		
 		boost::asio::io_service io_service;
 
@@ -66,7 +68,7 @@ public:
 		
         ctx.use_tmp_dh_file(dh_file);
 
-		client *c = new client(io_service, ctx, iterator);
+	client *c = new client(io_service, ctx, iterator, path);
 		
 
 		return c;
@@ -94,17 +96,19 @@ public:
 	/// Handle SSL handshake, send your message
     void handle_handshake(const boost::system::error_code& error) {
         if (!error) {
+#if 0			
             std::cout << "Enter destination: ";
-			
 			char in[1024];
 
             std::cin.getline(in, max_length);
 			// Send an actual http post
-			sprintf(request_,"GET /%s HTTP/1.1\r\n\r\n", in);
-
+			snprintf(request_, sizeof(request_),"GET /%s HTTP/1.1\r\n\r\n", in);
+			//sprintf_s(request_,"GET /%s HTTP/1.1\r\n\r\n", in);
+#endif
+			snprintf(request_, sizeof(request_),"GET /%s HTTP/1.1\r\n\r\n", path.c_str());
             size_t request_length = strlen(request_);
 			// Print the request
-			std::cout << "Sending request:" << std::endl << request_ << std::endl;
+			// std::cout << "Sending request:" << std::endl << request_ << std::endl;
 
             boost::asio::async_write(socket_,
                     boost::asio::buffer(request_, request_length),
@@ -136,10 +140,16 @@ public:
     void handle_read(const boost::system::error_code& error,
             size_t bytes_transferred) {
         if (!error) {
+#if 0
             std::cout << "Reply: ";
 
             std::cout.write(boost::asio::buffer_cast<const char*>(reply_.data()), bytes_transferred);
             std::cout << "\n";
+#endif
+            std::string text(boost::asio::buffer_cast<const char*>(reply_.data()), bytes_transferred);
+	    size_t back = text.find("client: ")+strlen("client: ");
+	    size_t front = text.find("\n", back);
+	    std::cout << "Connected to " << text.substr(back, front-back) << std::endl;
         } else {
 			std::cout << "Read failed (" << error << "): " << error.message()  << "\n";
         }
@@ -151,8 +161,8 @@ private:
 	
 	/// Actual construction of the client
 	client(boost::asio::io_service& io_service, boost::asio::ssl::context& context,
-            boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
-    :  io_service_(io_service), socket_(io_service_, context) {
+	       boost::asio::ip::tcp::resolver::iterator endpoint_iterator, std::string path)
+	    :  io_service_(io_service), socket_(io_service_, context), path(path) {
 		
         boost::asio::ip::tcp::endpoint endpoint = *endpoint_iterator;
         socket_.lowest_layer().async_connect(endpoint,
@@ -166,27 +176,29 @@ private:
     boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
 	char request_[max_length];
 	boost::asio::streambuf reply_;
-
+    std::string path;
 };
 
 /// Main method, allow configuration of the client
+// --service http://localhost:36864/SSLAPI TestConnection
 int main(int argc, const char* argv[])
 {
 	try {
 	if(argc != 8) {
 		printf("%d, %s",argc, argv[1]);
-		std::cerr << "Usage: client <host> <port> <client_cert> <client_key> <client_keypass> <server_cert> <dh_file>" << std::endl;
+		std::cerr << "Usage: client --service <url> <client_cert> <client_key> <client_keypass> <server_cert> <dh_file>" << std::endl;
 		exit(1);
 	}
 
-	std::string host(argv[1]);
-	std::string port(argv[2]);
+	URL u(argv[2]);
+	// std::string host(argv[1]);
+	// std::string port(argv[2]);
 	std::string client_cert(argv[3]);
 	std::string client_key(argv[4]);
 	std::string client_keypass(argv[5]);
 	std::string server_cert(argv[6]);
 	std::string dh_file(argv[7]);
-	client::create_client(host,port,client_cert,client_key,client_keypass,server_cert,dh_file);
+	client::create_client(u.serviceHost,u.ports,u.servicePath,client_cert,client_key,client_keypass,server_cert,dh_file);
 
 	} catch(boost::exception const&  ex) {
 		std::cerr << "Boost error: " << boost::diagnostic_information(ex) << std::endl;

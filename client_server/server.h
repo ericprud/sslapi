@@ -7,11 +7,16 @@
 struct handler;
 typedef boost::network::http::async_server<handler> server;
 
+struct netlib_server;
 struct handler {
+    handler (netlib_server* p_server_instance)
+    : p_server_instance(p_server_instance)
+    {  }
 	void operator()(server::request const& req, const server::connection_ptr& conn);
 	bool verify_cert(bool preverified,  boost::asio::ssl::verify_context& ctx);
 private:
 	std::string name;
+    netlib_server* p_server_instance;
 };
 
 void shut_me_down(
@@ -20,17 +25,21 @@ void shut_me_down(
 
 struct netlib_server {
 public:
-	static netlib_server& get_instance();
+	static netlib_server& get_instance(unsigned int port);
 
     handler request_handler;
 	boost::shared_ptr< boost::asio::io_service > p_io_service;
 	boost::shared_ptr< server > p_server_instance;
+    unsigned int port;
 
 
 	void run();
 
 	void stop();
+	void done();
+    unsigned int stopAfter;
 
 private:
-	netlib_server();
+	netlib_server(unsigned int port);
+    const static unsigned int RunForever = ~0;
 };
