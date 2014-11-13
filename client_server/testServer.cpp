@@ -125,7 +125,7 @@ namespace cliser {
 	    if (fgets(line, sizeof line, serverPipe) == NULL ||
 		strncmp("Working directory: ", line, 19))
 		throw std::string(serverCmd + " didn't print a status line");
-	    serverS += line;
+	    // serverS += line;
 	    waitConnect(hostIP, port);
 	}
 
@@ -286,8 +286,20 @@ struct ServerTableQuery : cliser::SPARQLClientServerInteraction {
 BOOST_AUTO_TEST_CASE( D_SELECT_SPO ) {
     ServerTableQuery i("--stop-after 1",
 		       "client.crt client.key test ca.crt dh512.pem");
-    std::string expected("Connected to /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n");
-    BOOST_CHECK_EQUAL(expected, i.clientS);
+    std::string clientText("Connected to /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n");
+    BOOST_CHECK_EQUAL(clientText, i.clientS);
+    std::string serverText("Verify \n\
+CTX ERROR : 0\n\
+CTX DEPTH : 1\n\
+Verifying /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=ca\n\
+Verification status :1\n\
+Verify \n\
+CTX ERROR : 0\n\
+CTX DEPTH : 0\n\
+Verifying /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n\
+Verification status :1\n\
+Terminated normally\n");
+    BOOST_CHECK_EQUAL(serverText, i.serverS);
 }
 
 
