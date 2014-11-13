@@ -85,11 +85,11 @@ add_executable(testServer ${TESTSERVER_SRC})
 target_link_libraries(testServer ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
 
 enable_testing()
-add_test(testServer server)
+add_test(server testServer)
 # how do i say that target test depends target server?
-# add_custom_target(test COMMAND ${CMAKE_CTEST_COMMAND}
-#                   DEPENDS server)
-# add_dependencies(test server)
+add_custom_target(test COMMAND ${CMAKE_CTEST_COMMAND}
+                  DEPENDS server testServer)
+# add_dependencies(test server testServer)
 
 # Copy the keys to the directory where the server executable is located (some extra keys are included which can be used by the client)
 foreach( key ${KEYS} )
