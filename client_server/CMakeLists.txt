@@ -11,7 +11,7 @@ set(Boost_USE_MULTITHREADED ON)
 
 # Find openssl + boost
 FIND_PACKAGE(OpenSSL)
-FIND_PACKAGE(Boost 1.54 COMPONENTS thread date_time program_options filesystem system chrono regex REQUIRED)
+FIND_PACKAGE(Boost 1.54 COMPONENTS thread date_time program_options filesystem system chrono regex unit_test_framework REQUIRED)
 
 # Find CPP-NETLIB
 set(CPP_NETLIB_INCLUDE_DIR "" CACHE FILEPATH "Path to cpp-netlib source dir")
@@ -73,15 +73,23 @@ server.pem)
 
 # Server
 add_executable(server ${SERVER_SRC})
-target_link_libraries(server ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${server_parsers} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(server ${Boost_THREAD_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${server_parsers} ${CMAKE_THREAD_LIBS_INIT})
 
 # Client
 add_executable(client ${CLIENT_SRC})
-target_link_libraries(client ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(client ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
 
 # Test adds -lboost_unit_test_framework
 add_executable(testServer ${TESTSERVER_SRC})
-target_link_libraries(testServer ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(testServer ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+
+enable_testing()
+add_test(testServer server)
+# how do i say that target test depends target server?
+# add_custom_target(test COMMAND ${CMAKE_CTEST_COMMAND}
+#                   DEPENDS server)
+# add_dependencies(test server)
 
 # Copy the keys to the directory where the server executable is located (some extra keys are included which can be used by the client)
 foreach( key ${KEYS} )

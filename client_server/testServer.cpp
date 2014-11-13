@@ -20,7 +20,7 @@
 #include <stdexcept>
 #include <boost/lexical_cast.hpp>
 
-#define BOOST_TEST_DYN_LINK
+//#define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE SSLAPI
 #include <boost/test/unit_test.hpp>
 
@@ -284,7 +284,7 @@ struct ServerTableQuery : cliser::SPARQLClientServerInteraction {
 /* Simple SELECT.
  */
 BOOST_AUTO_TEST_CASE( D_SELECT_SPO ) {
-    ServerTableQuery i("--stop-after 2",
+    ServerTableQuery i("--stop-after 1",
 		       "client.crt client.key test ca.crt dh512.pem");
     std::string expected("Connected to /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n");
     BOOST_CHECK_EQUAL(expected, i.clientS);

@@ -132,9 +132,30 @@ void netlib_server::stop() {
 	p_io_service->stop();
 }
 
+void global_stop (boost::shared_ptr< boost::asio::io_service > p_io_service, boost::system::error_code e) {
+    std::cerr << "stopping\n";
+    if (e) {
+	std::cerr << "error: " << e << std::endl;
+	usleep(50000);
+    }
+    p_io_service->stop();
+}
+
 void netlib_server::done() {
-    if (stopAfter != RunForever && --stopAfter == 0)
+    if (stopAfter != RunForever && --stopAfter == 0) {
+#if 1
+	usleep(50000);
 	stop();
+#else
+	boost::asio::deadline_timer timer(*p_io_service); 
+	timer.expires_from_now(boost::posix_time::microseconds(50000));
+# if 1
+	timer.async_wait(boost::bind(&global_stop, p_io_service, _1));
+# else
+	timer.async_wait(boost::bind(&netlib_server::stop, this));
+# endif
+#endif
+    }
 }
 
 netlib_server& netlib_server::get_instance(unsigned int port) {
