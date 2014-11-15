@@ -280,28 +280,31 @@ struct GenericServerTest : cliser::ClientServerInteraction {
 	: cliser::ClientServerInteraction ("./server", serverParams, "/SSLAPI", LOWPORT, HIPORT)
     {
 	invoke(cliser::substituteQueryVariables(clientInvocation, port));
+	const char* connection = "connection: ";
+	// clientS "ab:cd\tconnection: 127.0.0.1:36864\nefgh"
+	size_t start = clientS.find(connection);
+	size_t host = start+strlen(connection);
+	size_t port = clientS.find(":", host);
+	size_t end = clientS.find("\n", port);
+	// cout << clientS.substr(0, start)<<"|"
+	//      <<clientS.substr(host, port-host)<<"|"
+	//      <<clientS.substr(port+1,end-port-1)<<"|"
+	//      <<clientS.substr(end+1); }
+	std::string port_s = clientS.substr(port+1,end-port-1);
+	clientPort = atoi(port_s.c_str());
     }
+
+    int clientPort;
 };
 
 // run curl -k --cert client.pem:test https://localhost:8001/asdf
 BOOST_AUTO_TEST_CASE( CURL_GET ) {
     GenericServerTest i("--stop-after 1",
 		       "curl -k --cert client.pem:test https://localhost:%p/asdf");
-    const char* connection = "connection: ";
-    // i.clientS "ab:cd\tconnection: 127.0.0.1:36864\nefgh"
-    size_t start = i.clientS.find(connection);
-    size_t host = start+strlen(connection);
-    size_t port = i.clientS.find(":", host);
-    size_t end = i.clientS.find("\n", port);
-    // cout << i.clientS.substr(0, start)<<"|"
-    //      <<i.clientS.substr(host, port-host)<<"|"
-    //      <<i.clientS.substr(port+1,end-port-1)<<"|"
-    //      <<i.clientS.substr(end+1); }
-    std::string port_s = i.clientS.substr(port+1,end-port-1);
     std::string clientText(cliser::substituteQueryVariables("<HTML><HEAD/><BODY><pre>client: /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n\
 connection: 127.0.0.1:%p\n\
 path: /asdf\n\
-</pre></BODY></HTML>\n", atoi(port_s.c_str())));
+</pre></BODY></HTML>\n", i.clientPort));
     BOOST_CHECK_EQUAL(clientText, i.clientS);
     std::string serverText("Verify \n\
 CTX ERROR : 0\n\
