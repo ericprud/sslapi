@@ -260,11 +260,11 @@ namespace cliser {
     };
 
 
-    /** SPARQLClientServerInteraction - build a sparql client invocation string
+    /** SSLAPIClientServerInteraction - build an SSLAPI client invocation string
      *  from the parameters used in the server invocation.
      */
-    struct SPARQLClientServerInteraction : ClientServerInteraction {
-	SPARQLClientServerInteraction (std::string serverParams, std::string serverPath,
+    struct SSLAPIClientServerInteraction : ClientServerInteraction {
+	SSLAPIClientServerInteraction (std::string serverParams, std::string serverPath,
 				       std::string clientParams, int lowPort, int highPort)
 	    : ClientServerInteraction("./server", serverParams, serverPath, lowPort, highPort)
 	{
@@ -274,17 +274,58 @@ namespace cliser {
 
 } // namespace cliser 
 
-struct ServerTableQuery : cliser::SPARQLClientServerInteraction {
-    ServerTableQuery (std::string serverParams,
+struct GenericServerTest : cliser::ClientServerInteraction {
+    GenericServerTest (std::string serverParams,
+		       std::string clientInvocation)
+	: cliser::ClientServerInteraction ("./server", serverParams, "/SSLAPI", LOWPORT, HIPORT)
+    {
+	invoke(cliser::substituteQueryVariables(clientInvocation, port));
+    }
+};
+
+// run curl -k --cert client.pem:test https://localhost:8001/asdf
+BOOST_AUTO_TEST_CASE( CURL_GET ) {
+    GenericServerTest i("--stop-after 1",
+		       "curl -k --cert client.pem:test https://localhost:%p/asdf");
+    const char* connection = "connection: ";
+    // i.clientS "ab:cd\tconnection: 127.0.0.1:36864\nefgh"
+    size_t start = i.clientS.find(connection);
+    size_t host = start+strlen(connection);
+    size_t port = i.clientS.find(":", host);
+    size_t end = i.clientS.find("\n", port);
+    // cout << i.clientS.substr(0, start)<<"|"
+    //      <<i.clientS.substr(host, port-host)<<"|"
+    //      <<i.clientS.substr(port+1,end-port-1)<<"|"
+    //      <<i.clientS.substr(end+1); }
+    std::string port_s = i.clientS.substr(port+1,end-port-1);
+    std::string clientText(cliser::substituteQueryVariables("<HTML><HEAD/><BODY><pre>client: /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n\
+connection: 127.0.0.1:%p\n\
+path: /asdf\n\
+</pre></BODY></HTML>\n", atoi(port_s.c_str())));
+    BOOST_CHECK_EQUAL(clientText, i.clientS);
+    std::string serverText("Verify \n\
+CTX ERROR : 0\n\
+CTX DEPTH : 1\n\
+Verifying /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=ca\n\
+Verification status :1\n\
+Verify \n\
+CTX ERROR : 0\n\
+CTX DEPTH : 0\n\
+Verifying /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n\
+Verification status :1\n\
+Terminated normally\n");
+    BOOST_CHECK_EQUAL(serverText, i.serverS);
+}
+
+struct ClientServerTest : cliser::SSLAPIClientServerInteraction {
+    ClientServerTest (std::string serverParams,
 		      std::string clientParams)
-	: cliser::SPARQLClientServerInteraction (serverParams, "/SSLAPI", clientParams, LOWPORT, HIPORT)
+	: cliser::SSLAPIClientServerInteraction (serverParams, "/SSLAPI", clientParams, LOWPORT, HIPORT)
     {  }
 };
 
-/* Simple SELECT.
- */
-BOOST_AUTO_TEST_CASE( D_SELECT_SPO ) {
-    ServerTableQuery i("--stop-after 1",
+BOOST_AUTO_TEST_CASE( CLIENT_GET ) {
+    ClientServerTest i("--stop-after 1",
 		       "client.crt client.key test ca.crt dh512.pem");
     std::string clientText("Connected to /C=BE/ST=Some-State/O=Custodix/OU=maastro/CN=client\n");
     BOOST_CHECK_EQUAL(clientText, i.clientS);
