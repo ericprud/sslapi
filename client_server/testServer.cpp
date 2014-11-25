@@ -7,7 +7,13 @@
 
 #include <stdio.h>
 #include <assert.h>
+
+#ifdef _WIN32
+#include <WinSock2.h>
+#else
 #include <sys/wait.h>   /* header for waitpid() and various macros */
+#endif
+
 #include <errno.h>
 
 #ifdef _MSC_VER
@@ -37,12 +43,20 @@
 
 namespace cliser {
 
+#ifndef _WIN32
     /** SigChildGuard - capture SIGCHLD signals and record the child return value.
      */
     struct SigChildGuard {
 	static int ChildRet;		// A global to capture the result from a childHandler
 	static bool ChildRetSet;	// and a marker for whether it's set.
 
+
+	
+	SigChildGuard () {
+	}
+	
+	~SigChildGuard () {
+	}
 	struct sigaction oldact;
 
 	SigChildGuard () {
@@ -63,7 +77,6 @@ namespace cliser {
 	    if (sigaction(SIGCHLD, &oldact, NULL) < 0)
 		throw std::runtime_error("unable to restore old SIGCHLD action");
 	}
-
 	static void childHandler (int /* signo */) {
 	    int status, child_val;
 
@@ -77,9 +90,10 @@ namespace cliser {
 	    }
 	}
     };
+	
     int SigChildGuard::ChildRet = 0;		// A global to capture the result from a childHandler
     bool SigChildGuard::ChildRetSet = false;	// and a marker for whether it's set.
-
+#endif
 
     /** substituteQueryVariables - perform the following substitutions on s:
      *   %p -> port.
@@ -101,7 +115,7 @@ namespace cliser {
 	int port;
 	std::string serverS, serverURL;
 	FILE *serverPipe;
-	SigChildGuard g;
+	//SigChildGuard g;
 
 	ServerInteraction (std::string exe, std::string path,
 			   std::string hostIP, std::string serverParams,
@@ -119,7 +133,11 @@ namespace cliser {
 	    // serverCmd += " 2>&1 | tee -a server.mon";
 	    // BOOST_LOG_SEV(w3c_sw::Logger::ProcessLog::get(), w3c_sw::Logger::info)
 	    std::cerr << "serverCmd: " << serverCmd << std::endl;
+#ifdef _WIN32
+	    serverPipe = _popen(serverCmd.c_str(), "r");
+#else
 	    serverPipe = popen(serverCmd.c_str(), "r");
+#endif
 	    if (serverPipe == NULL)
 		throw std::string("popen") + strerror(errno);
 	    if (fgets(line, sizeof line, serverPipe) == NULL ||
@@ -130,11 +148,24 @@ namespace cliser {
 	}
 
 	~ServerInteraction () {
+#ifdef _WIN32
+	    if (_pclose(serverPipe) == -1 && errno != ECHILD)
+#else
 	    if (pclose(serverPipe) == -1 && errno != ECHILD)
+#endif
 		throw std::string() + "pclose(serverPipe)" + strerror(errno);
 	}
 
 	static int firstOpenPort (std::string ip, int start, int end) {
+#ifdef _WIN32
+		// Initialize WINSOCK
+		WSADATA wsaData;
+		int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+		if (iResult != NO_ERROR) {
+			wprintf(L"Error at WSAStartup()\n");
+			return 1;
+		}
+#endif
 	    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	    sockaddr_in remote;
 	    remote.sin_family = AF_INET;
@@ -144,10 +175,19 @@ namespace cliser {
 		remote.sin_port = htons(port);
 		int ret = bind(sockfd, (struct sockaddr *) &remote, sizeof(remote));
 		// w3c_sw_LINEN << " bind(" << port << ") = " << ret << " : " << strerror(errno) << "\n";
-		if (ret != -1) {
-		    close (sockfd);
-		    return port;
+		
+#ifdef _WIN32
+		if (ret != SOCKET_ERROR) {
+		    closesocket (sockfd); 
+			return port;
 		}
+#else
+		if (ret != -1) {
+		    close (sockfd); 
+			return port;
+		}
+#endif
+		   
 	    }
 	    throw std::runtime_error("Unable to find an available port between "
 				     + boost::lexical_cast<std::string>(start)
@@ -173,12 +213,17 @@ namespace cliser {
 		    // w3c_sw_LINEN << " still can't connect: " << strerror(errno) << "\n";
 		} else {
 		    // w3c_sw_LINEN << "Connected after " << (finish - start) << " seconds.\n";
-		    close(sockfd);
+#ifdef _WIN32
+			closesocket(sockfd);
+#else
+		    close (sockfd);
+#endif
 		    break;
 		}
 	    }
 	}
 
+#ifndef _WIN32
 	/** waitLsof - busywait grepping for port in lsof.
 	 * (An alternative to waitLsof.)
 	 */
@@ -201,6 +246,7 @@ namespace cliser {
 	    }
 	    w3c_sw_LINEN << "running\n";
 	}
+#endif
 
 	/** readToExhaustion - read and close an iostream.
 	 */
@@ -239,7 +285,11 @@ namespace cliser {
 
 	    /* Start the client and demand at least one line of output.
 	     */
+#ifdef _WIN32
+	    FILE *clientPipe = ::_popen(clientCmd.c_str(), "r");
+#else
 	    FILE *clientPipe = ::popen(clientCmd.c_str(), "r");
+#endif
 	    for (int tryNo = 0; tryNo < 2; ++tryNo)
 		if (fgets(line, sizeof line, clientPipe) == NULL) {
 		    if (errno != EINTR)
@@ -253,7 +303,11 @@ namespace cliser {
 	     */
 	    readToExhaustion(clientPipe, clientS);
 	    readToExhaustion(serverPipe, serverS);
+#ifdef _WIN32
+	    if (_pclose(clientPipe) == -1 && errno != ECHILD)
+#else
 	    if (pclose(clientPipe) == -1 && errno != ECHILD)
+#endif
 		throw std::string() + "pclose(clientPipe)" + strerror(errno);
 	}
 
@@ -263,6 +317,15 @@ namespace cliser {
     /** SSLAPIClientServerInteraction - build an SSLAPI client invocation string
      *  from the parameters used in the server invocation.
      */
+#ifdef _WIN32
+    struct SSLAPIClientServerInteraction : ClientServerInteraction {
+	SSLAPIClientServerInteraction (std::string serverParams, std::string serverPath,
+				       std::string clientParams, int lowPort, int highPort)
+	    : ClientServerInteraction("server", serverParams, serverPath, lowPort, highPort)
+	{
+	    invoke("client --service " + serverURL + " " + substituteQueryVariables(clientParams, port));
+	}
+#else
     struct SSLAPIClientServerInteraction : ClientServerInteraction {
 	SSLAPIClientServerInteraction (std::string serverParams, std::string serverPath,
 				       std::string clientParams, int lowPort, int highPort)
@@ -270,14 +333,20 @@ namespace cliser {
 	{
 	    invoke("./client --service " + serverURL + " " + substituteQueryVariables(clientParams, port));
 	}
+#endif
     };
+
 
 } // namespace cliser 
 
 struct GenericServerTest : cliser::ClientServerInteraction {
     GenericServerTest (std::string serverParams,
 		       std::string clientInvocation)
+#ifdef _WIN32
+	: cliser::ClientServerInteraction ("server", serverParams, "/SSLAPI", LOWPORT, HIPORT)
+#else
 	: cliser::ClientServerInteraction ("./server", serverParams, "/SSLAPI", LOWPORT, HIPORT)
+#endif
     {
 	invoke(cliser::substituteQueryVariables(clientInvocation, port));
 	const char* connection = "connection: ";

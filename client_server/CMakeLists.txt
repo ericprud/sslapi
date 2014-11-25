@@ -23,6 +23,7 @@ find_package(Threads REQUIRED)
 # Find cpp-netlib libs
 find_library(server_parsers cppnetlib-server-parsers ${CPP_NETLIB_LIB_DIR})
 
+
 # These are not required
 #find_library(client_conns cppnetlib-client-connections ${CPP_NETLIB_LIB_DIR})
 #find_library(uri cppnetlib-uri ${CPP_NETLIB_LIB_DIR})
@@ -73,16 +74,21 @@ server.pem)
 
 # Server
 add_executable(server ${SERVER_SRC})
-target_link_libraries(server ${Boost_THREAD_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${server_parsers} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(server ${Boost_THREAD_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_DATE_TIME_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${server_parsers} ${CMAKE_THREAD_LIBS_INIT})
 
 # Client
 add_executable(client ${CLIENT_SRC})
-target_link_libraries(client ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(client ${Boost_PROGRAM_OPTIONS_LIBRARY} ${Boost_SYSTEM_LIBRARY} ${Boost_REGEX_LIBRARY} ${OPENSSL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_DATE_TIME_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} )
 
 
 # Test adds -lboost_unit_test_framework
 add_executable(testServer ${TESTSERVER_SRC})
-target_link_libraries(testServer ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+
+if(WIN32)
+  target_link_libraries(testServer ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${Boost_DATE_TIME_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} wsock32 ws2_32)
+else(WIN32)
+	target_link_libraries(testServer ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${Boost_DATE_TIME_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_FILESYSTEM_LIBRARY})
+endif()
 
 enable_testing()
 add_test(server testServer)

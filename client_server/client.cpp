@@ -105,7 +105,11 @@ public:
 			snprintf(request_, sizeof(request_),"GET /%s HTTP/1.1\r\n\r\n", in);
 			//sprintf_s(request_,"GET /%s HTTP/1.1\r\n\r\n", in);
 #endif
-			snprintf(request_, sizeof(request_),"GET /%s HTTP/1.1\r\n\r\n", path.c_str());
+#ifdef _WIN32
+			sprintf(request_,"GET /%s HTTP/1.1\r\n\r\n", path.c_str());
+#else
+			sprintf(request_, sizeof(request_),"GET /%s HTTP/1.1\r\n\r\n", path.c_str());
+#endif
             size_t request_length = strlen(request_);
 			// Print the request
 			// std::cout << "Sending request:" << std::endl << request_ << std::endl;

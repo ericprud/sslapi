@@ -1,8 +1,8 @@
 #include "server.h"
 
-
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+
 
 #include <iostream>
 #include <signal.h>
@@ -136,7 +136,11 @@ void global_stop (boost::shared_ptr< boost::asio::io_service > p_io_service, boo
     std::cerr << "stopping\n";
     if (e) {
 	std::cerr << "error: " << e << std::endl;
+#ifdef _WIN32
+	Sleep(50);
+#else
 	usleep(50000);
+#endif
     }
     p_io_service->stop();
 }
@@ -144,7 +148,11 @@ void global_stop (boost::shared_ptr< boost::asio::io_service > p_io_service, boo
 void netlib_server::done() {
     if (stopAfter != RunForever && --stopAfter == 0) {
 #if 1
+#ifdef _WIN32
+	Sleep(50);
+#else
 	usleep(50000);
+#endif
 	stop();
 #else
 	boost::asio::deadline_timer timer(*p_io_service); 
