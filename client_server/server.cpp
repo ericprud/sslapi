@@ -76,12 +76,41 @@ bool handler::verify_cert(bool preverified,  boost::asio::ssl::verify_context& c
 		break;
 	}
 
+
 	const int32_t name_length = 256;
 	X509_NAME_oneline(X509_get_subject_name(cert), reinterpret_cast<char*>(subject_name), name_length);
 	name = reinterpret_cast<char*>(subject_name);
 	std::cout <<  "Verifying " <<  subject_name << std::endl;
 	std::cout << "Verification status :" << preverified<< std::endl;
 
+
+	// Handle extensions
+	ASN1_OBJECT *obj = OBJ_txt2obj("1.2.3.4", 0);
+
+	char buff[1024];
+
+	OBJ_obj2txt(buff, 1024, obj, 1); // 0 means it will prefer a textual representation (if available) rather than the numerical one
+
+	// Get the extension
+	int index = X509_get_ext_by_OBJ(cert, obj, 0);
+	if (index < X509_get_ext_count(cert) && index >= 0) {
+		std::cout << "Found extension on place " << index << std::endl;
+		X509_EXTENSION *ext = X509_get_ext(cert, index);
+
+
+		const unsigned char* octet_str_data = X509_EXTENSION_get_data(ext)->data;
+		long xlen;
+		int tag, xclass;
+		int ret = ASN1_get_object(&octet_str_data, &xlen, &tag, &xclass, X509_EXTENSION_get_data(ext)->length);
+
+
+		std::cout << "Extension " << buff << " has value " << octet_str_data << std::endl;
+	}
+	else {
+		std::cout << "No extension " << buff << " found" << std::endl;
+	}
+	
+	
 	return preverified;
 }
 
