@@ -48,29 +48,50 @@ dh512.pem:
 	openssl dhparam -out dh512.pem -2 1024
 
 ## build run environment
+# server environment
 run run/server run/client:
 	mkdir -p run/server run/client
 
-run/server/server.pem: server.crt private/server.pem run/server
+run/server/server.pem: server.crt private/server.pem | run/server
 	cat server.crt private/server.pem > run/server/server.pem
 
-run/server/dh512.pem: dh512.pem run/server
+run/server/dh512.pem: dh512.pem | run/server
 	ln -s ../../dh512.pem run/server/dh512.pem
 
-run/server/ca.crt: ca.crt run/server
+run/server/ca.crt: ca.crt | run/server
 	ln -s ../../ca.crt run/server/ca.crt
 
-runServer: run/server/server.pem run/server/dh512.pem run/server/ca.crt
-	(cd run/server && server --serve http://localhost:$(port)/$(path))&
-
-run/client/client.pem: private/client.pem run/client
+# client environment
+run/client/client.pem: private/client.pem | run/client
 	ln -s ../../private/client.pem run/client/client.pem
 
-run/client/client.crt: client.crt run/client
+run/client/client.crt: client.crt | run/client
 	ln -s ../../client.crt run/client/client.crt
 
-runCurl: run/client/client.pem run/client/client.crt
+## run an SSL server
+runSSLserver run/server/pid:
+	(cd run/server && openssl s_server -accept $(port) -CAfile ca.crt -dkey dh512.pem -cert server.pem -verify ca.crt -www)&
+	sleep 1 && touch run/server/pid
+
+## run the compiled server
+runServer run/server/pid: run/server/server.pem run/server/dh512.pem run/server/ca.crt
+	(cd run/server && server --serve http://localhost:$(port)/$(path))&
+	sleep 1 && touch run/server/pid
+
+## run curl client
+runCurl: run/client/client.pem run/client/client.crt run/server/pid
 	(cd run/client && curl -k --cert client.crt --key client.pem https://localhost:$(port)/$(path))
 
-test: runServer runCurl
+runClient-noworky: run/client/client.crt run/client/client.key $(cakey) run/server/ca.crt run/server/dh512.pem
+	client.exe localhost $(port) client.crt client.key $(cakey) ca.crt dh512.pem
+
+
+## tests
+test0: runSSLserver runCurl
+	killall openssl
+	rm run/server/pid
+
+test1: runServer runCurl
+	killall server
+	rm run/server/pid
 
