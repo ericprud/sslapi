@@ -22,8 +22,8 @@ certindex.txt certindex.txt.attr:
 openssl.conf:
 	curl -o openssl.conf https://raw.githubusercontent.com/ericprud/sslapi/master/admin/sample-openssl.conf
 
-private/cakey.pem cacert.pem: openssl.conf
-	echo "\n\n\n$(caCN)" | openssl req -new -x509 -extensions v3_ca -keyout private/cakey.pem -out cacert.pem -days 3650 -config ./openssl.conf -passout pass:$(cakey)
+private/cakey.pem ca.crt: openssl.conf
+	echo "\n\n\n$(caCN)" | openssl req -new -x509 -extensions v3_ca -keyout private/cakey.pem -out ca.crt -days 3650 -config ./openssl.conf -passout pass:$(cakey)
 
 ## Create a server certificate
 # Create CSR
@@ -57,8 +57,8 @@ run/server/server.pem: server.crt private/server.pem run/server
 run/server/dh512.pem: dh512.pem run/server
 	ln -s ../../dh512.pem run/server/dh512.pem
 
-run/server/ca.crt: cacert.pem run/server
-	ln -s ../../cacert.pem run/server/ca.crt
+run/server/ca.crt: ca.crt run/server
+	ln -s ../../ca.crt run/server/ca.crt
 
 runServer: run/server/server.pem run/server/dh512.pem run/server/ca.crt
 	(cd run/server && server --serve http://localhost:$(port)/$(path))&
